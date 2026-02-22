@@ -23,6 +23,21 @@ actor AliyunService {
         }
     }
 
+    struct ClothingItemDTO: Sendable {
+        let id: UUID
+        let name: String
+        let categoryRaw: String
+        let subcategory: String
+        let primaryColor: String
+        let secondaryColor: String?
+        let material: String
+        let warmthLevel: Int
+        let styleTags: [String]
+        let fit: String
+        let itemDescription: String
+        let photoBase64: String
+    }
+
     private init() {}
 
     // MARK: - Clothing Analysis
@@ -93,8 +108,8 @@ actor AliyunService {
         let responseData = try await makeRequest(body: requestBody)
         let content = try extractContent(from: responseData)
 
-        // Parse JSON from content
-        guard let jsonData = content.data(using: .utf8) else {
+        let cleaned = stripMarkdownCodeBlock(content)
+        guard let jsonData = cleaned.data(using: .utf8) else {
             throw AliyunError.invalidResponse
         }
 
@@ -104,13 +119,13 @@ actor AliyunService {
 
     // MARK: - Text Selection
 
-    func textSelectOutfits(candidates: [ClothingItem], occasion: String, weather: WeatherInfo) async throws -> [UUID] {
+    func textSelectOutfits(candidates: [ClothingItemDTO], occasion: String, weather: WeatherInfo) async throws -> [UUID] {
         var candidatesList = "可选服装列表：\n\n"
         for item in candidates {
             candidatesList += """
             ID: \(item.id.uuidString)
             名称: \(item.name)
-            分类: \(item.category.rawValue) - \(item.subcategory)
+            分类: \(item.categoryRaw) - \(item.subcategory)
             颜色: \(item.primaryColor)\(item.secondaryColor.map { " / \($0)" } ?? "")
             材质: \(item.material)
             保暖度: \(item.warmthLevel)/5
@@ -152,8 +167,8 @@ actor AliyunService {
         let responseData = try await makeRequest(body: requestBody)
         let content = try extractContent(from: responseData)
 
-        // Parse JSON
-        guard let jsonData = content.data(using: .utf8) else {
+        let cleaned = stripMarkdownCodeBlock(content)
+        guard let jsonData = cleaned.data(using: .utf8) else {
             throw AliyunError.invalidResponse
         }
 
@@ -169,7 +184,7 @@ actor AliyunService {
 
     // MARK: - Multimodal Recommendation
 
-    func multimodalRecommend(items: [ClothingItem], occasion: String, weather: WeatherInfo, count: Int) -> AsyncThrowingStream<String, Error> {
+    nonisolated func multimodalRecommend(items: [ClothingItemDTO], occasion: String, weather: WeatherInfo, count: Int) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -188,8 +203,7 @@ actor AliyunService {
 
                     // Add images and metadata
                     for item in items {
-                        let base64Image = item.photo.base64EncodedString()
-                        let imageURL = "data:image/jpeg;base64,\(base64Image)"
+                        let imageURL = "data:image/jpeg;base64,\(item.photoBase64)"
 
                         contentArray.append([
                             "type": "image_url",
@@ -200,7 +214,7 @@ actor AliyunService {
 
                         ID: \(item.id.uuidString)
                         名称: \(item.name)
-                        分类: \(item.category.rawValue)
+                        分类: \(item.categoryRaw)
                         颜色: \(item.primaryColor)
                         风格: \(item.styleTags.joined(separator: ", "))
                         描述: \(item.itemDescription)
@@ -299,5 +313,18 @@ actor AliyunService {
         }
 
         return content
+    }
+
+    private func stripMarkdownCodeBlock(_ text: String) -> String {
+        var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("```json") {
+            cleaned = String(cleaned.dropFirst("```json".count))
+        } else if cleaned.hasPrefix("```") {
+            cleaned = String(cleaned.dropFirst("```".count))
+        }
+        if cleaned.hasSuffix("```") {
+            cleaned = String(cleaned.dropLast("```".count))
+        }
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

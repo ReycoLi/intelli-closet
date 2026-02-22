@@ -1,6 +1,6 @@
 import Foundation
 
-struct ClothingAnalysisResult: Codable {
+nonisolated struct ClothingAnalysisResult: Codable, Sendable {
     let isValid: Bool
     let invalidReason: String?
     let name: String?

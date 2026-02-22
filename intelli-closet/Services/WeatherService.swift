@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import WeatherKit
+import MapKit
 
 @Observable
 class WeatherService: NSObject, CLLocationManagerDelegate {
@@ -36,11 +37,14 @@ class WeatherService: NSObject, CLLocationManagerDelegate {
     }
 
     func fetchWeatherByCity(_ city: String) async throws -> WeatherInfo {
-        let geocoder = CLGeocoder()
-        let placemarks = try await geocoder.geocodeAddressString(city)
-        guard let location = placemarks.first?.location else {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = city
+        let search = MKLocalSearch(request: request)
+        let response = try await search.start()
+        guard let mapItem = response.mapItems.first else {
             throw WeatherError.cityNotFound
         }
+        let location = mapItem.location
         let weather = try await weatherService.weather(for: location)
         let current = weather.currentWeather
 

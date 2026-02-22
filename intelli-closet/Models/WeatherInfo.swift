@@ -1,6 +1,6 @@
 import Foundation
 
-struct WeatherInfo {
+nonisolated struct WeatherInfo: Sendable {
     let temperature: Double
     let feelsLike: Double
     let condition: String

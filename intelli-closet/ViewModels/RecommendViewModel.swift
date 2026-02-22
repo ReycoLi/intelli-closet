@@ -106,26 +106,45 @@ class RecommendViewModel {
                 return
             }
 
+            // Convert to DTOs on MainActor before sending to actor
+            let candidateDTOs = candidates.map { item in
+                AliyunService.ClothingItemDTO(
+                    id: item.id,
+                    name: item.name,
+                    categoryRaw: item.categoryRaw,
+                    subcategory: item.subcategory,
+                    primaryColor: item.primaryColor,
+                    secondaryColor: item.secondaryColor,
+                    material: item.material,
+                    warmthLevel: item.warmthLevel,
+                    styleTags: item.styleTags,
+                    fit: item.fit,
+                    itemDescription: item.itemDescription,
+                    photoBase64: item.photo.base64EncodedString()
+                )
+            }
+
             // Step 3: Text selection
             currentStep = .textSelecting
             let selectedIDs = try await AliyunService.shared.textSelectOutfits(
-                candidates: candidates,
+                candidates: candidateDTOs,
                 occasion: selectedOccasion,
                 weather: weather
             )
 
-            let shortlist = candidates.filter { selectedIDs.contains($0.id) }
-            shortlistCount = shortlist.count
+            let shortlistIDs = Set(selectedIDs)
+            let shortlistDTOs = candidateDTOs.filter { shortlistIDs.contains($0.id) }
+            shortlistCount = shortlistDTOs.count
 
-            let finalCandidates = shortlist.count >= 4 ? shortlist : candidates
+            let finalDTOs = shortlistDTOs.count >= 4 ? shortlistDTOs : candidateDTOs
 
             // Step 4: Multimodal recommendation
             currentStep = .multimodalSelecting
             streamedText = ""
 
             var fullText = ""
-            let stream = try await AliyunService.shared.multimodalRecommend(
-                items: finalCandidates,
+            let stream = AliyunService.shared.multimodalRecommend(
+                items: finalDTOs,
                 occasion: selectedOccasion,
                 weather: weather,
                 count: outfitCount
@@ -137,7 +156,7 @@ class RecommendViewModel {
             }
 
             // Parse outfits
-            let parsedOutfits = parseOutfits(from: fullText, allItems: finalCandidates)
+            let parsedOutfits = parseOutfits(from: fullText, allItems: candidates)
             outfits = parsedOutfits
 
             currentStep = .done
