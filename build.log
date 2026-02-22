@@ -1,0 +1,4 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild build -project intelli-closet.xcodeproj -scheme intelli-closet -destination "platform=iOS Simulator,name=iPhone 16"
+
+2026-02-23 00:47:24.070 xcodebuild[21795:403461] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
