@@ -10,8 +10,8 @@ import SwiftData
 
 struct AddClothingView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel = AddClothingViewModel()
+    @State private var showSaveSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -46,7 +46,11 @@ struct AddClothingView: View {
                         viewModel: viewModel,
                         onSave: {
                             if viewModel.saveClothing(modelContext: modelContext) {
-                                dismiss()
+                                showSaveSuccess = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                    showSaveSuccess = false
+                                    viewModel.reset()
+                                }
                             }
                         },
                         onCancel: {
@@ -57,15 +61,6 @@ struct AddClothingView: View {
             }
             .navigationTitle("添加衣物")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if case .pickPhoto = viewModel.state {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") {
-                            dismiss()
-                        }
-                    }
-                }
-            }
             .alert("错误", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("确定") {
                     viewModel.errorMessage = nil
@@ -73,6 +68,19 @@ struct AddClothingView: View {
             } message: {
                 if let errorMessage = viewModel.errorMessage {
                     Text(errorMessage)
+                }
+            }
+            .overlay {
+                if showSaveSuccess {
+                    VStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundStyle(.green)
+                        Text("保存成功")
+                            .font(.headline)
+                    }
+                    .padding(30)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                 }
             }
         }
