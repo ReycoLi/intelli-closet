@@ -244,7 +244,7 @@ actor AliyunService {
                     // Make streaming request
                     var request = URLRequest(url: URL(string: "\(self.baseURL)/chat/completions")!)
                     request.httpMethod = "POST"
-                    request.timeoutInterval = 120
+                    request.timeoutInterval = 30
                     request.setValue("Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
@@ -287,7 +287,7 @@ actor AliyunService {
     private func makeRequest(body: [String: Any]) async throws -> Data {
         var request = URLRequest(url: URL(string: "\(baseURL)/chat/completions")!)
         request.httpMethod = "POST"
-        request.timeoutInterval = 120
+        request.timeoutInterval = 30
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

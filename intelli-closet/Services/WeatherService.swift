@@ -1,6 +1,5 @@
 import Foundation
 import CoreLocation
-import WeatherKit
 import MapKit
 
 @Observable
@@ -8,11 +7,9 @@ class WeatherService: NSObject, CLLocationManagerDelegate {
     static let shared = WeatherService()
 
     private let locationManager = CLLocationManager()
-    private let weatherService = WeatherKit.WeatherService.shared
     private var locationContinuation: CheckedContinuation<CLLocation, Error>?
 
     var lastWeather: WeatherInfo?
-    var locationError: Error?
 
     override init() {
         super.init()
@@ -22,18 +19,7 @@ class WeatherService: NSObject, CLLocationManagerDelegate {
 
     func fetchWeather() async throws -> WeatherInfo {
         let location = try await requestLocation()
-        let weather = try await weatherService.weather(for: location)
-        let current = weather.currentWeather
-
-        let info = WeatherInfo(
-            temperature: current.temperature.value,
-            feelsLike: current.apparentTemperature.value,
-            condition: current.condition.description,
-            humidity: current.humidity,
-            windSpeed: current.wind.speed.value
-        )
-        lastWeather = info
-        return info
+        return try await fetchOpenMeteo(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
     }
 
     func fetchWeatherByCity(_ city: String) async throws -> WeatherInfo {
@@ -44,20 +30,65 @@ class WeatherService: NSObject, CLLocationManagerDelegate {
         guard let mapItem = response.mapItems.first else {
             throw WeatherError.cityNotFound
         }
-        let location = mapItem.location
-        let weather = try await weatherService.weather(for: location)
-        let current = weather.currentWeather
+        let coord = mapItem.location.coordinate
+        return try await fetchOpenMeteo(latitude: coord.latitude, longitude: coord.longitude)
+    }
+
+    // MARK: - Open-Meteo API (free, no key required)
+
+    private func fetchOpenMeteo(latitude: Double, longitude: Double) async throws -> WeatherInfo {
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto"
+        guard let url = URL(string: urlString) else {
+            throw WeatherError.cityNotFound
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let current = json?["current"] as? [String: Any] else {
+            throw WeatherError.cityNotFound
+        }
+
+        let temp = current["temperature_2m"] as? Double ?? 20
+        let feelsLike = current["apparent_temperature"] as? Double ?? temp
+        let humidity = (current["relative_humidity_2m"] as? Double ?? 50) / 100.0
+        let windSpeed = current["wind_speed_10m"] as? Double ?? 0
+        let weatherCode = current["weather_code"] as? Int ?? 0
 
         let info = WeatherInfo(
-            temperature: current.temperature.value,
-            feelsLike: current.apparentTemperature.value,
-            condition: current.condition.description,
-            humidity: current.humidity,
-            windSpeed: current.wind.speed.value
+            temperature: temp,
+            feelsLike: feelsLike,
+            condition: Self.weatherCondition(from: weatherCode),
+            humidity: humidity,
+            windSpeed: windSpeed
         )
         lastWeather = info
         return info
     }
+
+    private static func weatherCondition(from code: Int) -> String {
+        switch code {
+        case 0: return "晴天"
+        case 1: return "大部晴朗"
+        case 2: return "多云"
+        case 3: return "阴天"
+        case 45, 48: return "雾"
+        case 51, 53, 55: return "毛毛雨"
+        case 61, 63, 65: return "雨"
+        case 66, 67: return "冻雨"
+        case 71, 73, 75: return "雪"
+        case 77: return "雪粒"
+        case 80, 81, 82: return "阵雨"
+        case 85, 86: return "阵雪"
+        case 95: return "雷暴"
+        case 96, 99: return "冰雹雷暴"
+        default: return "未知"
+        }
+    }
+
+    // MARK: - Location
 
     private func requestLocation() async throws -> CLLocation {
         locationManager.requestWhenInUseAuthorization()
