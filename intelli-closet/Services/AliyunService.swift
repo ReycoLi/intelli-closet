@@ -161,7 +161,8 @@ actor AliyunService {
                     "role": "user",
                     "content": systemPrompt
                 ]
-            ]
+            ],
+            "chat_template_kwargs": ["enable_thinking": false]
         ]
 
         let responseData = try await makeRequest(body: requestBody)
@@ -238,7 +239,8 @@ actor AliyunService {
                                 "content": contentArray
                             ]
                         ],
-                        "stream": true
+                        "stream": true,
+                        "chat_template_kwargs": ["enable_thinking": false]
                     ]
 
                     // Make streaming request
