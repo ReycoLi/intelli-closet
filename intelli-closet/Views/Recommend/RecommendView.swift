@@ -64,37 +64,68 @@ struct RecommendView: View {
     }
 
     private var errorView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 60))
-                .foregroundStyle(.red)
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.red)
 
-            Text("推荐失败")
-                .font(.title2)
-                .fontWeight(.bold)
+                Text("推荐失败")
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
 
-            Button {
-                viewModel.reset()
-            } label: {
-                Text("重试")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+                // Filter explanation
+                if !viewModel.filterSummary.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("筛选详情", systemImage: "line.3.horizontal.decrease.circle")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Text(viewModel.filterSummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if !viewModel.filteredOutDetails.isEmpty {
+                            Divider()
+                            Text("被过滤的衣物：")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            ForEach(viewModel.filteredOutDetails, id: \.self) { detail in
+                                Text("· \(detail)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.mint)
-                    )
-                    .foregroundStyle(.white)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemGray6)))
+                    .padding(.horizontal)
+                }
+
+                Button {
+                    viewModel.reset()
+                } label: {
+                    Text("重试")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.mint)
+                        )
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
+            .padding(.vertical)
         }
     }
 }

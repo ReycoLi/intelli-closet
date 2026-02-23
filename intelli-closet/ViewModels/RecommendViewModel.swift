@@ -30,6 +30,8 @@ class RecommendViewModel {
     var streamedText: String = ""
     var outfits: [OutfitRecommendation] = []
     var errorMessage: String?
+    var filterSummary: String = ""
+    var filteredOutDetails: [String] = []
 
     // Weather fallback
     var showCityInput: Bool = false
@@ -96,12 +98,22 @@ class RecommendViewModel {
         do {
             // Step 1: Local filter
             currentStep = .filtering
-            let candidates = LocalFilterService.filterCandidates(
+            let result = LocalFilterService.filterCandidates(
                 allItems: allItems,
                 weather: weather,
                 occasion: selectedOccasion
             )
+            let candidates = result.candidates
             candidateCount = candidates.count
+
+            // Build filter summary
+            var summaryParts = ["筛选条件：\(result.warmthRange)"]
+            if let style = result.styleFilter {
+                summaryParts.append(style)
+            }
+            summaryParts.append("总共\(allItems.count)件 → 通过\(candidates.count)件，过滤\(result.filteredOut.count)件")
+            filterSummary = summaryParts.joined(separator: "\n")
+            filteredOutDetails = result.filteredOut.map { $0.reason }
 
             let tops = candidates.filter { $0.categoryRaw == "上装" }
             let bottoms = candidates.filter { $0.categoryRaw == "下装" }
@@ -292,6 +304,8 @@ class RecommendViewModel {
         streamedText = ""
         outfits = []
         errorMessage = nil
+        filterSummary = ""
+        filteredOutDetails = []
         showCityInput = false
         cityInput = ""
         showManualWeather = false

@@ -32,7 +32,7 @@ struct RecommendProgressView: View {
                 title: "筛选候选衣物",
                 isCompleted: isStepCompleted(.filtering),
                 isCurrent: viewModel.currentStep == .filtering,
-                detail: isStepCompleted(.filtering) ? "上装\(viewModel.topCount)件 / 下装\(viewModel.bottomCount)件" : nil
+                detail: isStepCompleted(.filtering) ? "上装\(viewModel.topCount)件 / 下装\(viewModel.bottomCount)件（过滤\(viewModel.filteredOutDetails.count)件）" : nil
             )
 
             // Step 3: Pre-selecting (only shown in two-stage)
