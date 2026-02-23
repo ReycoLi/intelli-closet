@@ -1,14 +1,8 @@
-//
-//  AddClothingViewModel.swift
-//  intelli-closet
-//
-//  Created by Zhe Li on 2026/2/23.
-//
-
 import Foundation
 import SwiftUI
 import PhotosUI
 import SwiftData
+import CryptoKit
 
 @Observable
 class AddClothingViewModel {
@@ -18,19 +12,50 @@ class AddClothingViewModel {
         case analyzing
         case invalidPhoto(reason: String)
         case editResult
+        case batchAnalyzing
+        case batchReview
     }
 
-    // Photo handling
-    var selectedPhoto: PhotosPickerItem?
+    // MARK: - Batch Item
+
+    @Observable
+    class BatchItem: Identifiable {
+        let id = UUID()
+        let image: UIImage
+        var status: BatchItemStatus = .analyzing
+        var name = ""
+        var category: ClothingCategory = .top
+        var subcategory = ""
+        var primaryColor = ""
+        var secondaryColor = ""
+        var material = ""
+        var warmthLevel = 3
+        var styleTags: [String] = []
+        var fit = ""
+        var itemDescription = ""
+        var isDuplicate = false
+
+        init(image: UIImage) {
+            self.image = image
+        }
+    }
+
+    enum BatchItemStatus {
+        case analyzing
+        case success
+        case invalid(String)
+        case failed(String)
+    }
+
+    // MARK: - Single photo (camera)
+
     var capturedImage: UIImage?
     var showCamera = false
-
-    // Analysis
     var analysisResult: ClothingAnalysisResult?
     var isAnalyzing = false
     var errorMessage: String?
 
-    // Editable fields
+    // Editable fields (single mode)
     var name = ""
     var category: ClothingCategory = .top
     var subcategory = ""
@@ -42,34 +67,31 @@ class AddClothingViewModel {
     var fit = ""
     var itemDescription = ""
 
+    // MARK: - Batch photo (album)
+
+    var selectedPhotos: [PhotosPickerItem] = []
+    var batchItems: [BatchItem] = []
+
     var state: State = .pickPhoto
 
-    @MainActor
-    func handleSelectedPhoto() async {
-        guard let selectedPhoto = selectedPhoto else { return }
-
-        do {
-            guard let data = try await selectedPhoto.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data) else {
-                errorMessage = "无法加载照片"
-                return
-            }
-
-            capturedImage = image
-            await analyzeImage(image)
-        } catch {
-            errorMessage = "加载照片失败: \(error.localizedDescription)"
-        }
+    var batchAnalyzedCount: Int {
+        batchItems.filter { if case .analyzing = $0.status { return false } else { return true } }.count
     }
+
+    var batchSuccessItems: [BatchItem] {
+        batchItems.filter { if case .success = $0.status { return true } else { return false } }
+    }
+
+    // MARK: - Camera (single photo)
 
     @MainActor
     func handleCapturedImage(_ image: UIImage) async {
         capturedImage = image
-        await analyzeImage(image)
+        await analyzeSingleImage(image)
     }
 
     @MainActor
-    func analyzeImage(_ image: UIImage) async {
+    private func analyzeSingleImage(_ image: UIImage) async {
         state = .analyzing
         isAnalyzing = true
         errorMessage = nil
@@ -86,7 +108,6 @@ class AddClothingViewModel {
             analysisResult = result
 
             if result.isValid {
-                // Populate editable fields
                 name = result.name ?? ""
                 if let categoryStr = result.category {
                     category = categoryStr == "上装" ? .top : .bottom
@@ -99,7 +120,6 @@ class AddClothingViewModel {
                 styleTags = result.styleTags ?? []
                 fit = result.fit ?? ""
                 itemDescription = result.description ?? ""
-
                 state = .editResult
             } else {
                 state = .invalidPhoto(reason: result.invalidReason ?? "照片不符合要求")
@@ -108,9 +128,84 @@ class AddClothingViewModel {
             errorMessage = "分析失败: \(error.localizedDescription)"
             state = .pickPhoto
         }
-
         isAnalyzing = false
     }
+
+    // MARK: - Batch (album multi-select)
+
+    @MainActor
+    func handleSelectedPhotos(existingItems: [ClothingItem]) async {
+        guard !selectedPhotos.isEmpty else { return }
+
+        let existingHashes = Set(existingItems.compactMap { photoHash($0.thumbnail) })
+
+        batchItems = []
+        state = .batchAnalyzing
+
+        // Load all images first
+        var loaded: [UIImage] = []
+        for item in selectedPhotos {
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                loaded.append(image)
+            }
+        }
+        selectedPhotos = []
+
+        // Create batch items and check duplicates via thumbnail hash
+        for image in loaded {
+            let batchItem = BatchItem(image: image)
+            if let thumbData = ImageUtils.generateThumbnail(image) {
+                let hash = photoHash(thumbData)
+                if existingHashes.contains(hash) {
+                    batchItem.isDuplicate = true
+                    batchItem.status = .invalid("该衣物已存在衣橱中")
+                }
+            }
+            batchItems.append(batchItem)
+        }
+
+        // Analyze non-duplicate items in parallel
+        await withTaskGroup(of: Void.self) { group in
+            for item in batchItems where !item.isDuplicate {
+                group.addTask { @MainActor in
+                    await self.analyzeBatchItem(item)
+                }
+            }
+        }
+
+        state = .batchReview
+    }
+
+    @MainActor
+    private func analyzeBatchItem(_ item: BatchItem) async {
+        do {
+            guard let compressed = ImageUtils.compressImage(item.image) else {
+                item.status = .failed("图片压缩失败")
+                return
+            }
+            let result = try await AliyunService.shared.analyzeClothing(imageData: compressed)
+            if result.isValid {
+                item.name = result.name ?? ""
+                item.category = (result.category == "上装") ? .top : .bottom
+                item.subcategory = result.subcategory ?? ""
+                item.primaryColor = result.primaryColor ?? ""
+                item.secondaryColor = result.secondaryColor ?? ""
+                item.material = result.material ?? ""
+                item.warmthLevel = result.warmthLevel ?? 3
+                item.styleTags = result.styleTags ?? []
+                item.fit = result.fit ?? ""
+                item.itemDescription = result.description ?? ""
+                item.status = .success
+            } else {
+                item.status = .invalid(result.invalidReason ?? "照片不符合要求")
+            }
+        } catch {
+            item.status = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Save
 
     func saveClothing(modelContext: ModelContext) -> Bool {
         guard let image = capturedImage else { return false }
@@ -122,31 +217,32 @@ class AddClothingViewModel {
         }
 
         let item = ClothingItem(
-            name: name,
-            photo: photoData,
-            thumbnail: thumbnailData,
-            category: category,
-            subcategory: subcategory,
+            name: name, photo: photoData, thumbnail: thumbnailData,
+            category: category, subcategory: subcategory,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor.isEmpty ? nil : secondaryColor,
-            material: material,
-            warmthLevel: warmthLevel,
-            styleTags: styleTags,
-            fit: fit,
-            itemDescription: itemDescription
+            material: material, warmthLevel: warmthLevel,
+            styleTags: styleTags, fit: fit, itemDescription: itemDescription
         )
-
         modelContext.insert(item)
         return true
     }
 
+    // MARK: - Helpers
+
+    private func photoHash(_ data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+    }
+
     func reset() {
-        selectedPhoto = nil
         capturedImage = nil
         analysisResult = nil
         isAnalyzing = false
         errorMessage = nil
         showCamera = false
+        selectedPhotos = []
+        batchItems = []
 
         name = ""
         category = .top

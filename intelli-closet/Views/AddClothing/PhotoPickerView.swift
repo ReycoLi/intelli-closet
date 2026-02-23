@@ -1,10 +1,3 @@
-//
-//  PhotoPickerView.swift
-//  intelli-closet
-//
-//  Created by Zhe Li on 2026/2/23.
-//
-
 import SwiftUI
 import PhotosUI
 
@@ -19,9 +12,13 @@ struct PhotoPickerView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(.mint)
 
-            Text("拍照或选择一件衣物")
+            Text("拍照或选择衣物")
                 .font(.title2)
                 .foregroundStyle(.secondary)
+
+            Text("支持一次选择最多5张照片")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
 
             VStack(spacing: 16) {
                 Button {
@@ -33,7 +30,11 @@ struct PhotoPickerView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.mint)
 
-                PhotosPicker(selection: $viewModel.selectedPhoto, matching: .images) {
+                PhotosPicker(
+                    selection: $viewModel.selectedPhotos,
+                    maxSelectionCount: 5,
+                    matching: .images
+                ) {
                     Label("从相册选择", systemImage: "photo.on.rectangle")
                         .frame(maxWidth: .infinity)
                 }
@@ -43,11 +44,6 @@ struct PhotoPickerView: View {
             .padding(.horizontal, 40)
 
             Spacer()
-        }
-        .onChange(of: viewModel.selectedPhoto) { _, _ in
-            Task {
-                await viewModel.handleSelectedPhoto()
-            }
         }
         .fullScreenCover(isPresented: $viewModel.showCamera) {
             CameraView { image in
