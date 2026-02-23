@@ -1,0 +1,15 @@
+# Secrets
+intelli-closet/Secrets.swift
+
+# Xcode
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+DerivedData/
+build/
+
+# macOS
+.DS_Store
+
+# Claude
+.claude/

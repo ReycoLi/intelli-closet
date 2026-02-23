@@ -3,7 +3,7 @@ import Foundation
 actor AliyunService {
     static let shared = AliyunService()
 
-    private let apiKey = "sk-d786ca6e288a4e6aa977de07d479a3a8"
+    private let apiKey = Secrets.aliyunAPIKey
     private let baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     enum AliyunError: LocalizedError {

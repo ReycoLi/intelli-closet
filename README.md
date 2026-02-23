@@ -66,13 +66,15 @@ intelli-closet/
 
 - Xcode 16+
 - iOS 18+
-- 阿里云百炼 API Key（已内置于 AliyunService 中，发布前请替换为自己的 Key）
+- 阿里云百炼 API Key
 
 ## 运行
 
 1. 克隆项目
-2. 用 Xcode 打开 `intelli-closet.xcodeproj`
-3. 选择真机或模拟器，Build & Run
+2. 复制 `intelli-closet/Secrets.example` 为 `intelli-closet/Secrets.swift`
+3. 在 `Secrets.swift` 中填入你的阿里云百炼 API Key
+4. 用 Xcode 打开 `intelli-closet.xcodeproj`
+5. 选择真机或模拟器，Build & Run
 
 ## License
 
