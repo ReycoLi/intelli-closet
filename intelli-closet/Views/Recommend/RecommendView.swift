@@ -17,7 +17,7 @@ struct RecommendView: View {
                         }
                     }
 
-                case .fetchingWeather, .filtering, .textSelecting, .multimodalSelecting:
+                case .fetchingWeather, .filtering, .preSelecting, .recommending:
                     RecommendProgressView(viewModel: viewModel)
 
                 case .done:

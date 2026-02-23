@@ -4,12 +4,12 @@ struct RecommendProgressView: View {
     let viewModel: RecommendViewModel
 
     var body: some View {
-        VStack(spacing: 30) {
+        VStack(spacing: 24) {
             Spacer()
 
             // Step 1: Fetching Weather
             stepRow(
-                icon: "☁️",
+                icon: "cloud.sun",
                 title: "获取天气信息",
                 isCompleted: isStepCompleted(.fetchingWeather),
                 isCurrent: viewModel.currentStep == .fetchingWeather,
@@ -18,33 +18,27 @@ struct RecommendProgressView: View {
 
             // Step 2: Filtering
             stepRow(
-                icon: "👔",
+                icon: "line.3.horizontal.decrease.circle",
                 title: "筛选候选衣物",
                 isCompleted: isStepCompleted(.filtering),
                 isCurrent: viewModel.currentStep == .filtering,
-                detail: isStepCompleted(.filtering) ? "已筛出 \(viewModel.candidateCount) 件候选" : nil
+                detail: isStepCompleted(.filtering) ? "上装\(viewModel.topCount)件 / 下装\(viewModel.bottomCount)件" : nil
             )
 
-            // Step 3: Text Selecting
-            stepRow(
-                icon: "🤔",
-                title: "分析搭配方案",
-                isCompleted: isStepCompleted(.textSelecting),
-                isCurrent: viewModel.currentStep == .textSelecting,
-                detail: isStepCompleted(.textSelecting) ? "已选出 \(viewModel.shortlistCount) 件候选" : nil
-            )
-
-            // Step 4: Multimodal Selecting
-            stepRow(
-                icon: "👀",
-                title: "审美精选",
-                isCompleted: isStepCompleted(.multimodalSelecting),
-                isCurrent: viewModel.currentStep == .multimodalSelecting,
-                detail: nil
-            )
+            // Step 3: Pre-selecting (only shown in two-stage)
+            if viewModel.currentStep == .preSelecting || isStepCompleted(.preSelecting) {
+                stepRow(
+                    icon: "text.magnifyingglass",
+                    title: "智能预筛选",
+                    isCompleted: isStepCompleted(.preSelecting),
+                    isCurrent: viewModel.currentStep == .preSelecting,
+                    detail: nil
+                )
+            }
 
             // Streamed text
-            if viewModel.currentStep == .multimodalSelecting && !viewModel.streamedText.isEmpty {
+            if !viewModel.streamedText.isEmpty &&
+                (viewModel.currentStep == .preSelecting || viewModel.currentStep == .recommending) {
                 Divider()
                     .padding(.horizontal)
 
@@ -52,6 +46,7 @@ struct RecommendProgressView: View {
                     Text(viewModel.streamedText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal)
                 }
                 .frame(maxHeight: 150)
@@ -65,8 +60,10 @@ struct RecommendProgressView: View {
     private func stepRow(icon: String, title: String, isCompleted: Bool, isCurrent: Bool, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Text(icon)
+                Image(systemName: icon)
                     .font(.title2)
+                    .foregroundStyle(isCurrent ? .mint : isCompleted ? .mint : .gray)
+                    .frame(width: 30)
 
                 Text(title)
                     .font(.headline)
@@ -90,14 +87,14 @@ struct RecommendProgressView: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .padding(.leading, 40)
+                    .padding(.leading, 42)
             }
         }
         .padding(.horizontal)
     }
 
     private func isStepCompleted(_ step: RecommendViewModel.ProgressStep) -> Bool {
-        let steps: [RecommendViewModel.ProgressStep] = [.fetchingWeather, .filtering, .textSelecting, .multimodalSelecting, .done]
+        let steps: [RecommendViewModel.ProgressStep] = [.fetchingWeather, .filtering, .preSelecting, .recommending, .done]
         guard let currentIndex = steps.firstIndex(of: viewModel.currentStep),
               let stepIndex = steps.firstIndex(of: step) else {
             return false

@@ -87,21 +87,10 @@ actor AliyunService {
         let requestBody: [String: Any] = [
             "model": "qwen-vl-max",
             "messages": [
-                [
-                    "role": "system",
-                    "content": systemPrompt
-                ],
-                [
-                    "role": "user",
-                    "content": [
-                        [
-                            "type": "image_url",
-                            "image_url": [
-                                "url": imageURL
-                            ]
-                        ]
-                    ]
-                ]
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": [
+                    ["type": "image_url", "image_url": ["url": imageURL]]
+                ]]
             ]
         ]
 
@@ -113,166 +102,130 @@ actor AliyunService {
             throw AliyunError.invalidResponse
         }
 
-        let decoder = JSONDecoder()
-        return try decoder.decode(ClothingAnalysisResult.self, from: jsonData)
+        return try JSONDecoder().decode(ClothingAnalysisResult.self, from: jsonData)
     }
 
-    // MARK: - Text Selection
+    // MARK: - Text Selection (streaming, for two-stage path)
 
-    func textSelectOutfits(candidates: [ClothingItemDTO], occasion: String, weather: WeatherInfo) async throws -> [UUID] {
-        var candidatesList = "可选服装列表：\n\n"
-        for item in candidates {
-            candidatesList += """
-            ID: \(item.id.uuidString)
-            名称: \(item.name)
-            分类: \(item.categoryRaw) - \(item.subcategory)
-            颜色: \(item.primaryColor)\(item.secondaryColor.map { " / \($0)" } ?? "")
-            材质: \(item.material)
-            保暖度: \(item.warmthLevel)/5
-            风格: \(item.styleTags.joined(separator: ", "))
-            版型: \(item.fit)
-            描述: \(item.itemDescription)
-
+    nonisolated func streamTextSelect(candidates: [ClothingItemDTO], occasion: String, weather: WeatherInfo, targetCount: Int) -> AsyncThrowingStream<String, Error> {
+        let candidatesList = candidates.map { item in
             """
-        }
+            ID: \(item.id.uuidString)
+            名称: \(item.name) | \(item.categoryRaw)-\(item.subcategory) | \(item.primaryColor) | 保暖\(item.warmthLevel)/5 | \(item.styleTags.joined(separator: ","))
+            """
+        }.joined(separator: "\n")
 
-        let systemPrompt = """
-        你是一个专业的服装搭配顾问。根据场合、天气和用户的衣橱，从候选服装中挑选6-8件最适合的单品。
+        let prompt = """
+        你是专业服装搭配顾问。从以下\(candidates.count)件候选服装中，挑选\(targetCount)件最适合的单品。
 
         场合: \(occasion)
         天气: \(weather.summary)
 
         \(candidatesList)
 
-        请从以上服装中挑选6-8件最适合的单品，考虑：
-        1. 天气适宜性（温度、保暖度）
-        2. 场合匹配度
-        3. 颜色和风格协调性
-        4. 搭配可能性
-
-        只返回JSON格式，包含选中的服装ID数组：
-        {"selectedIds": ["id1", "id2", ...]}
+        考虑天气适宜性、场合匹配、颜色风格协调性。
+        只返回JSON：{"selectedIds": ["id1", "id2", ...]}
         """
 
-        let requestBody: [String: Any] = [
-            "model": "qwen3.5-plus",
-            "messages": [
-                [
-                    "role": "user",
-                    "content": systemPrompt
-                ]
-            ],
-            "chat_template_kwargs": ["enable_thinking": false]
-        ]
-
-        let responseData = try await makeRequest(body: requestBody)
-        let content = try extractContent(from: responseData)
-
-        let cleaned = stripMarkdownCodeBlock(content)
-        guard let jsonData = cleaned.data(using: .utf8) else {
-            throw AliyunError.invalidResponse
-        }
-
-        struct SelectionResponse: Codable {
-            let selectedIds: [String]
-        }
-
-        let decoder = JSONDecoder()
-        let response = try decoder.decode(SelectionResponse.self, from: jsonData)
-
-        return response.selectedIds.compactMap { UUID(uuidString: $0) }
+        return makeStreamingRequest(prompt: prompt)
     }
 
-    // MARK: - Multimodal Recommendation
+    // MARK: - Multimodal Recommendation (streaming)
 
     nonisolated func multimodalRecommend(items: [ClothingItemDTO], occasion: String, weather: WeatherInfo, count: Int) -> AsyncThrowingStream<String, Error> {
+        var contentArray: [[String: Any]] = []
+
+        let prompt = """
+        你是一个专业的服装搭配顾问。根据以下服装的实际照片和信息，推荐\(count)套搭配方案。
+
+        场合: \(occasion)
+        天气: \(weather.summary)
+
+        服装信息：
+        """
+        contentArray.append(["type": "text", "text": prompt])
+
+        for item in items {
+            let imageURL = "data:image/jpeg;base64,\(item.photoBase64)"
+            contentArray.append([
+                "type": "image_url",
+                "image_url": ["url": imageURL]
+            ])
+            let metadata = """
+
+            ID: \(item.id.uuidString)
+            名称: \(item.name)
+            分类: \(item.categoryRaw)
+            颜色: \(item.primaryColor)
+            风格: \(item.styleTags.joined(separator: ", "))
+            描述: \(item.itemDescription)
+            """
+            contentArray.append(["type": "text", "text": metadata])
+        }
+
+        let instruction = """
+
+        请基于视觉美感推荐\(count)套搭配（每套包含一件上装和一件下装），只返回JSON格式：
+        {"outfits": [{"topId": "id", "bottomId": "id", "reasoning": "搭配理由"}]}
+        """
+        contentArray.append(["type": "text", "text": instruction])
+
+        return makeStreamingRequest(content: contentArray)
+    }
+
+    // MARK: - Private Helpers
+
+    /// Streaming request with text-only prompt
+    private nonisolated func makeStreamingRequest(prompt: String) -> AsyncThrowingStream<String, Error> {
+        let requestBody: [String: Any] = [
+            "model": "qwen3.5-plus",
+            "messages": [["role": "user", "content": prompt]],
+            "stream": true,
+            "enable_thinking": false
+        ]
+        return executeStreamingRequest(body: requestBody)
+    }
+
+    /// Streaming request with multimodal content array
+    private nonisolated func makeStreamingRequest(content: [[String: Any]]) -> AsyncThrowingStream<String, Error> {
+        let requestBody: [String: Any] = [
+            "model": "qwen3.5-plus",
+            "messages": [["role": "user", "content": content]],
+            "stream": true,
+            "enable_thinking": false
+        ]
+        return executeStreamingRequest(body: requestBody)
+    }
+
+    private nonisolated func executeStreamingRequest(body: [String: Any]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    var contentArray: [[String: Any]] = []
-
-                    // Add text prompt
-                    let prompt = """
-                    你是一个专业的服装搭配顾问。根据以下服装的实际照片和信息，推荐\(count)套搭配方案。
-
-                    场合: \(occasion)
-                    天气: \(weather.summary)
-
-                    服装信息：
-                    """
-                    contentArray.append(["type": "text", "text": prompt])
-
-                    // Add images and metadata
-                    for item in items {
-                        let imageURL = "data:image/jpeg;base64,\(item.photoBase64)"
-
-                        contentArray.append([
-                            "type": "image_url",
-                            "image_url": ["url": imageURL]
-                        ])
-
-                        let metadata = """
-
-                        ID: \(item.id.uuidString)
-                        名称: \(item.name)
-                        分类: \(item.categoryRaw)
-                        颜色: \(item.primaryColor)
-                        风格: \(item.styleTags.joined(separator: ", "))
-                        描述: \(item.itemDescription)
-                        """
-                        contentArray.append(["type": "text", "text": metadata])
-                    }
-
-                    // Add final instruction
-                    let instruction = """
-
-                    请基于视觉美感推荐\(count)套搭配（每套包含一件上装和一件下装），只返回JSON格式：
-                    {"outfits": [{"topId": "id", "bottomId": "id", "reasoning": "搭配理由"}]}
-                    """
-                    contentArray.append(["type": "text", "text": instruction])
-
-                    let requestBody: [String: Any] = [
-                        "model": "qwen3.5-plus",
-                        "messages": [
-                            [
-                                "role": "user",
-                                "content": contentArray
-                            ]
-                        ],
-                        "stream": true,
-                        "chat_template_kwargs": ["enable_thinking": false]
-                    ]
-
-                    // Make streaming request
                     var request = URLRequest(url: URL(string: "\(self.baseURL)/chat/completions")!)
                     request.httpMethod = "POST"
                     request.timeoutInterval = 30
                     request.setValue("Bearer \(self.apiKey)", forHTTPHeaderField: "Authorization")
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+                    request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
                     let (bytes, response) = try await URLSession.shared.bytes(for: request)
 
                     guard let httpResponse = response as? HTTPURLResponse,
                           (200...299).contains(httpResponse.statusCode) else {
-                        throw AliyunError.streamingFailed("HTTP error")
+                        throw AliyunError.invalidResponse
                     }
 
                     for try await line in bytes.lines {
-                        if line.hasPrefix("data: ") {
-                            let data = line.dropFirst(6)
-                            if data == "[DONE]" {
-                                continuation.finish()
-                                return
-                            }
+                        guard line.hasPrefix("data: ") else { continue }
+                        let data = String(line.dropFirst(6))
+                        if data == "[DONE]" { break }
 
-                            if let jsonData = data.data(using: .utf8),
-                               let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                               let choices = json["choices"] as? [[String: Any]],
-                               let delta = choices.first?["delta"] as? [String: Any],
-                               let content = delta["content"] as? String {
-                                continuation.yield(content)
-                            }
+                        if let jsonData = data.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                           let choices = json["choices"] as? [[String: Any]],
+                           let delta = choices.first?["delta"] as? [String: Any],
+                           let content = delta["content"] as? String {
+                            continuation.yield(content)
                         }
                     }
 
@@ -284,8 +237,7 @@ actor AliyunService {
         }
     }
 
-    // MARK: - Private Helpers
-
+    /// Non-streaming request (used for clothing analysis)
     private func makeRequest(body: [String: Any]) async throws -> Data {
         var request = URLRequest(url: URL(string: "\(baseURL)/chat/completions")!)
         request.httpMethod = "POST"
@@ -315,7 +267,6 @@ actor AliyunService {
               let content = message["content"] as? String else {
             throw AliyunError.invalidResponse
         }
-
         return content
     }
 
