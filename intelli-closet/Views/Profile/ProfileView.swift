@@ -13,6 +13,7 @@ struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [UserProfile]
     @State private var viewModel = ProfileViewModel()
+    @FocusState private var isInputFocused: Bool
 
     private var profile: UserProfile {
         if let existing = profiles.first {
@@ -35,6 +36,7 @@ struct ProfileView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .focused($isInputFocused)
                         Text("cm")
                             .foregroundStyle(.secondary)
                     }
@@ -46,6 +48,7 @@ struct ProfileView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
+                            .focused($isInputFocused)
                         Text("kg")
                             .foregroundStyle(.secondary)
                     }
@@ -88,6 +91,14 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("我的")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") {
+                        isInputFocused = false
+                    }
+                }
+            }
             .onAppear {
                 viewModel.load(from: profile)
             }
