@@ -38,23 +38,74 @@ struct OutfitResultView: View {
     }
 
     private func outfitCard(_ outfit: OutfitRecommendation) -> some View {
-        VStack(spacing: 20) {
-            // Clothing items
-            HStack(spacing: 20) {
-                clothingCard(item: outfit.top, label: "上装")
-                clothingCard(item: outfit.bottom, label: "下装")
-            }
-            .padding(.horizontal)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Clothing items
+                HStack(spacing: 20) {
+                    clothingCard(item: outfit.top, label: "上装")
+                    clothingCard(item: outfit.bottom, label: "下装")
+                }
 
-            // Reasoning
-            ScrollView {
-                Text(outfit.reasoning)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                // Summary
+                if !outfit.summary.isEmpty {
+                    Text(outfit.summary)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
+                // Structured reasoning tags
+                VStack(spacing: 10) {
+                    reasoningRow(icon: "paintpalette", label: "颜色", text: outfit.colorMatch)
+                    reasoningRow(icon: "sparkles", label: "风格", text: outfit.styleMatch)
+                    reasoningRow(icon: "thermometer.medium", label: "天气", text: outfit.weatherFit)
+                    reasoningRow(icon: "mappin.circle", label: "场合", text: outfit.occasionFit)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6))
+                )
+                .padding(.horizontal)
+
+                // Aesthetic comment
+                if !outfit.aesthetic.isEmpty {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "eye")
+                            .foregroundStyle(.mint)
+                            .padding(.top, 2)
+                        Text(outfit.aesthetic)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .italic()
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.mint.opacity(0.08))
+                    )
                     .padding(.horizontal)
+                }
             }
+            .padding(.vertical)
         }
-        .padding(.vertical)
+    }
+
+    private func reasoningRow(icon: String, label: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(.mint)
+                .frame(width: 20)
+            Text(label)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .frame(width: 32, alignment: .leading)
+            Text(text)
+                .font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func clothingCard(item: ClothingItem, label: String) -> some View {

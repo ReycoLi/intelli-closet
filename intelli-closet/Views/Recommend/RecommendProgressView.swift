@@ -2,6 +2,16 @@ import SwiftUI
 
 struct RecommendProgressView: View {
     let viewModel: RecommendViewModel
+    @State private var tipIndex: Int = 0
+    @State private var pulse: Bool = false
+
+    private let tips: [(icon: String, text: String)] = [
+        ("paintpalette", "正在分析颜色搭配…"),
+        ("sparkles", "考虑风格协调性…"),
+        ("thermometer.medium", "结合天气选择面料…"),
+        ("mappin.circle", "评估场合适配度…"),
+        ("arrow.triangle.2.circlepath", "对比不同组合方案…"),
+    ]
 
     var body: some View {
         VStack(spacing: 24) {
@@ -36,25 +46,55 @@ struct RecommendProgressView: View {
                 )
             }
 
-            // Streamed text
-            if !viewModel.streamedText.isEmpty &&
-                (viewModel.currentStep == .preSelecting || viewModel.currentStep == .recommending) {
-                Divider()
-                    .padding(.horizontal)
+            // Step 4: Recommending
+            if viewModel.currentStep == .recommending || isStepCompleted(.recommending) {
+                stepRow(
+                    icon: "wand.and.stars",
+                    title: "生成搭配方案",
+                    isCompleted: isStepCompleted(.recommending),
+                    isCurrent: viewModel.currentStep == .recommending,
+                    detail: nil
+                )
+            }
 
-                ScrollView {
-                    Text(viewModel.streamedText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
+            // Animated thinking tips (replaces raw JSON)
+            if viewModel.currentStep == .preSelecting || viewModel.currentStep == .recommending {
+                HStack(spacing: 10) {
+                    Image(systemName: tips[tipIndex].icon)
+                        .font(.title3)
+                        .foregroundStyle(.mint)
+                        .symbolEffect(.pulse, options: .repeating)
+                    Text(tips[tipIndex].text)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                 }
-                .frame(maxHeight: 150)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.mint.opacity(0.1))
+                )
+                .scaleEffect(pulse ? 1.03 : 1.0)
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulse)
+                .contentTransition(.numericText())
+                .animation(.easeInOut(duration: 0.4), value: tipIndex)
+                .onAppear {
+                    pulse = true
+                    startTipRotation()
+                }
             }
 
             Spacer()
         }
         .padding()
+    }
+
+    private func startTipRotation() {
+        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            withAnimation {
+                tipIndex = (tipIndex + 1) % tips.count
+            }
+        }
     }
 
     private func stepRow(icon: String, title: String, isCompleted: Bool, isCurrent: Bool, detail: String?) -> some View {

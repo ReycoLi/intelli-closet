@@ -165,8 +165,18 @@ actor AliyunService {
 
         let instruction = """
 
-        请基于视觉美感推荐\(count)套搭配（每套包含一件上装和一件下装），只返回JSON格式：
-        {"outfits": [{"topId": "id", "bottomId": "id", "reasoning": "搭配理由"}]}
+        请基于视觉美感推荐\(count)套搭配（每套包含一件上装和一件下装）。
+
+        严格要求：每个字段必须具体有用，但限制在20字以内，只说最关键的一句。
+        - colorMatch（≤20字）: 什么色配什么色、为什么好看（如"深灰配卡其，低饱和层次感"）
+        - styleMatch（≤20字）: 版型/风格为什么搭（如"宽松卫衣配修身裤，松紧对比显腿长"）
+        - weatherFit（≤20字）: 结合\(weather.temperature)°C说明（如"棉质保暖3级，6°C内搭够用"）
+        - occasionFit（≤20字）: 为什么适合\(occasion)（如"休闲舒适，逛街走动不拘束"）
+        - aesthetic（≤25字）: 整体氛围气质（如"日系文艺少年感，干净清爽给人好印象"）
+        - summary（≤15字）: 一句话核心亮点
+
+        只返回JSON格式：
+        {"outfits": [{"topId": "id", "bottomId": "id", "summary": "亮点", "colorMatch": "颜色", "styleMatch": "风格", "weatherFit": "天气", "occasionFit": "场合", "aesthetic": "审美"}]}
         """
         contentArray.append(["type": "text", "text": instruction])
 

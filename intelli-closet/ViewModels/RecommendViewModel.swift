@@ -261,14 +261,22 @@ class RecommendViewModel {
         for outfitDict in outfitsArray {
             guard let topIdString = outfitDict["topId"] as? String,
                   let bottomIdString = outfitDict["bottomId"] as? String,
-                  let reasoning = outfitDict["reasoning"] as? String,
                   let topId = UUID(uuidString: topIdString),
                   let bottomId = UUID(uuidString: bottomIdString),
                   let top = allItems.first(where: { $0.id == topId }),
                   let bottom = allItems.first(where: { $0.id == bottomId }) else {
                 continue
             }
-            results.append(OutfitRecommendation(top: top, bottom: bottom, reasoning: reasoning))
+            results.append(OutfitRecommendation(
+                top: top,
+                bottom: bottom,
+                summary: outfitDict["summary"] as? String ?? "",
+                colorMatch: outfitDict["colorMatch"] as? String ?? "",
+                styleMatch: outfitDict["styleMatch"] as? String ?? "",
+                weatherFit: outfitDict["weatherFit"] as? String ?? "",
+                occasionFit: outfitDict["occasionFit"] as? String ?? "",
+                aesthetic: outfitDict["aesthetic"] as? String ?? ""
+            ))
         }
         return results
     }
