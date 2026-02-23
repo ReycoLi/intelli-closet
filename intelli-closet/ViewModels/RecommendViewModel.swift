@@ -120,7 +120,7 @@ class RecommendViewModel {
                     styleTags: item.styleTags,
                     fit: item.fit,
                     itemDescription: item.itemDescription,
-                    photoBase64: item.photo.base64EncodedString()
+                    photoBase64: item.thumbnail.base64EncodedString()
                 )
             }
 
