@@ -42,11 +42,17 @@ struct ClothingDetailEditView: View {
 
             Section("保暖等级") {
                 Picker("保暖等级", selection: $item.warmthLevel) {
-                    ForEach(1...5, id: \.self) { level in
-                        Text("\(level)").tag(level)
+                    ForEach(WarmthLevel.allCases, id: \.rawValue) { level in
+                        Text(level.label).tag(level.rawValue)
                     }
                 }
                 .pickerStyle(.segmented)
+
+                if let level = WarmthLevel(rawValue: item.warmthLevel) {
+                    Text("\(level.temperatureRange) · \(level.examples)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("编辑衣物")

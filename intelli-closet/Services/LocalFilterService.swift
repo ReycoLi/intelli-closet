@@ -30,20 +30,16 @@ struct LocalFilterService {
     ) -> FilterResult {
         let temp = weather.temperature
 
-        let warmthDesc: String
+        let warmthDesc = WarmthLevel.filterDescription(for: Int(temp))
         let warmthCheck: (Int) -> Bool
         switch temp {
         case ..<10:
-            warmthDesc = "保暖≥3级（低温）"
             warmthCheck = { $0 >= 3 }
         case 10..<20:
-            warmthDesc = "保暖2-4级（凉爽）"
             warmthCheck = { $0 >= 2 && $0 <= 4 }
         case 20..<28:
-            warmthDesc = "保暖≤3级（温暖）"
             warmthCheck = { $0 <= 3 }
         default:
-            warmthDesc = "保暖≤2级（炎热）"
             warmthCheck = { $0 <= 2 }
         }
 
@@ -57,7 +53,7 @@ struct LocalFilterService {
             } else {
                 filteredOut.append(FilteredOutItem(
                     item: item,
-                    reason: "\(item.name)保暖\(item.warmthLevel)级，不符合\(warmthDesc)"
+                    reason: "\(item.name)是\(WarmthLevel(rawValue: item.warmthLevel)?.label ?? "未知")（等级\(item.warmthLevel)），不适合当前温度"
                 ))
             }
         }

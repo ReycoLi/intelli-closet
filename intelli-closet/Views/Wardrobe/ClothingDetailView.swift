@@ -46,7 +46,7 @@ struct ClothingDetailView: View {
                         AttributeRow(label: "辅色", value: secondaryColor)
                     }
                     AttributeRow(label: "材质", value: item.material)
-                    AttributeRow(label: "保暖等级", value: "\(item.warmthLevel)")
+                    AttributeRow(label: "保暖等级", value: WarmthLevel(rawValue: item.warmthLevel)?.label ?? "\(item.warmthLevel)")
                     AttributeRow(label: "版型", value: item.fit)
                     AttributeRow(label: "风格", value: item.styleTags.joined(separator: ", "))
                 }
