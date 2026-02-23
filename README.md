@@ -71,7 +71,7 @@ intelli-closet/
 ## 运行
 
 1. 克隆项目
-2. 复制 `intelli-closet/Secrets.example` 为 `intelli-closet/Secrets.swift`
+2. 复制 `Secrets.example` 为 `intelli-closet/Secrets.swift`
 3. 在 `Secrets.swift` 中填入你的阿里云百炼 API Key
 4. 用 Xcode 打开 `intelli-closet.xcodeproj`
 5. 选择真机或模拟器，Build & Run

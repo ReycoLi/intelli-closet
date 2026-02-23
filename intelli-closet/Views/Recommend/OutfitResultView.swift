@@ -110,7 +110,7 @@ struct OutfitResultView: View {
 
     private func clothingCard(item: ClothingItem, label: String) -> some View {
         VStack(spacing: 8) {
-            if let uiImage = UIImage(data: item.photo) {
+            if let uiImage = UIImage(data: item.thumbnail) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()

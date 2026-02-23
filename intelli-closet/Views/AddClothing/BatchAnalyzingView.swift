@@ -17,11 +17,13 @@ struct BatchAnalyzingView: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                 ForEach(viewModel.batchItems) { item in
                     ZStack {
-                        Image(uiImage: item.image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        if let uiImage = item.thumbnailImage {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
 
                         // Status overlay
                         RoundedRectangle(cornerRadius: 8)

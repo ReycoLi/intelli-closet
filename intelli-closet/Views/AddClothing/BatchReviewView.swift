@@ -94,11 +94,8 @@ struct BatchReviewView: View {
     }
 
     private func saveItem(_ item: AddClothingViewModel.BatchItem) {
-        guard let photoData = ImageUtils.compressImage(item.image),
-              let thumbnailData = ImageUtils.generateThumbnail(item.image) else { return }
-
         let clothing = ClothingItem(
-            name: item.name, photo: photoData, thumbnail: thumbnailData,
+            name: item.name, photo: item.photoData, thumbnail: item.thumbnailData,
             category: item.category, subcategory: item.subcategory,
             primaryColor: item.primaryColor,
             secondaryColor: item.secondaryColor.isEmpty ? nil : item.secondaryColor,
@@ -121,8 +118,6 @@ struct BatchReviewView: View {
         if id == currentItemID { return .mint }
         return .gray.opacity(0.3)
     }
-
-// PLACEHOLDER_REMAINING
 
     private var doneView: some View {
         VStack(spacing: 20) {
@@ -187,11 +182,13 @@ private struct BatchItemEditCard: View {
     private var editForm: some View {
         Form {
             Section {
-                Image(uiImage: item.image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                if let uiImage = item.thumbnailImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
 
             Section("基本信息") {

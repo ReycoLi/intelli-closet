@@ -21,7 +21,8 @@ class AddClothingViewModel {
     @Observable
     class BatchItem: Identifiable {
         let id = UUID()
-        let image: UIImage
+        let photoData: Data
+        let thumbnailData: Data
         var status: BatchItemStatus = .analyzing
         var name = ""
         var category: ClothingCategory = .top
@@ -35,8 +36,13 @@ class AddClothingViewModel {
         var itemDescription = ""
         var isDuplicate = false
 
-        init(image: UIImage) {
-            self.image = image
+        init(photoData: Data, thumbnailData: Data) {
+            self.photoData = photoData
+            self.thumbnailData = thumbnailData
+        }
+
+        var thumbnailImage: UIImage? {
+            UIImage(data: thumbnailData)
         }
     }
 
@@ -142,28 +148,25 @@ class AddClothingViewModel {
         batchItems = []
         state = .batchAnalyzing
 
-        // Load all images first
-        var loaded: [UIImage] = []
-        for item in selectedPhotos {
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data) {
-                loaded.append(image)
+        // Load and compress one at a time to avoid memory spike
+        for pickerItem in selectedPhotos {
+            guard let rawData = try? await pickerItem.loadTransferable(type: Data.self),
+                  let image = UIImage(data: rawData),
+                  let compressed = ImageUtils.compressImage(image),
+                  let thumbnail = ImageUtils.generateThumbnail(image) else {
+                continue
             }
-        }
-        selectedPhotos = []
+            // image goes out of scope here — memory released
 
-        // Create batch items and check duplicates via thumbnail hash
-        for image in loaded {
-            let batchItem = BatchItem(image: image)
-            if let thumbData = ImageUtils.generateThumbnail(image) {
-                let hash = photoHash(thumbData)
-                if existingHashes.contains(hash) {
-                    batchItem.isDuplicate = true
-                    batchItem.status = .invalid("该衣物已存在衣橱中")
-                }
+            let batchItem = BatchItem(photoData: compressed, thumbnailData: thumbnail)
+            let hash = photoHash(thumbnail)
+            if existingHashes.contains(hash) {
+                batchItem.isDuplicate = true
+                batchItem.status = .invalid("该衣物已存在衣橱中")
             }
             batchItems.append(batchItem)
         }
+        selectedPhotos = []
 
         // Analyze non-duplicate items in parallel
         await withTaskGroup(of: Void.self) { group in
@@ -180,11 +183,7 @@ class AddClothingViewModel {
     @MainActor
     private func analyzeBatchItem(_ item: BatchItem) async {
         do {
-            guard let compressed = ImageUtils.compressImage(item.image) else {
-                item.status = .failed("图片压缩失败")
-                return
-            }
-            let result = try await AliyunService.shared.analyzeClothing(imageData: compressed)
+            let result = try await AliyunService.shared.analyzeClothing(imageData: item.photoData)
             if result.isValid {
                 item.name = result.name ?? ""
                 item.category = (result.category == "上装") ? .top : .bottom

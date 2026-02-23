@@ -80,21 +80,21 @@ struct RecommendProgressView: View {
                 .animation(.easeInOut(duration: 0.4), value: tipIndex)
                 .onAppear {
                     pulse = true
-                    startTipRotation()
+                }
+                .task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(3))
+                        guard !Task.isCancelled else { break }
+                        withAnimation {
+                            tipIndex = (tipIndex + 1) % tips.count
+                        }
+                    }
                 }
             }
 
             Spacer()
         }
         .padding()
-    }
-
-    private func startTipRotation() {
-        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-            withAnimation {
-                tipIndex = (tipIndex + 1) % tips.count
-            }
-        }
     }
 
     private func stepRow(icon: String, title: String, isCompleted: Bool, isCurrent: Bool, detail: String?) -> some View {
